@@ -10,7 +10,14 @@ public class EciesCryptoPP
 {
 	public static byte[] privateKey;
 	public static byte[] publicKey;
+        
+        public static byte[] OldprivateKey;
+        public static byte[] otherprivateKey;
+        
 	public static byte[] PWEKey;
+        
+        public static byte[] WildKey;
+        
 	public static byte[] PWEKeyUpdaterConf;
 	public static byte[] PWEKeyBuildver;
 	public static byte[] PWEKeyFileHash;
@@ -22,11 +29,19 @@ public class EciesCryptoPP
 		loadPrivateKey();
 		loadPublicKey();
 		loadPWEKey();
+                loadOldPrivateKey();
+                loadOtherPrivateKey();
+                
 	}
 	
 	public static byte[] decrypt(byte[] encdata)
 	{
 		return decrypt(privateKey, privateKey.length, encdata, encdata.length);
+	}
+        
+        public static byte[] decryptWild(byte[] encdata)
+	{
+		return decrypt(WildKey, WildKey.length, encdata, encdata.length);
 	}
 	
 	public static byte[] decryptPWE(byte[] encdata)
@@ -111,6 +126,61 @@ public class EciesCryptoPP
 		return "EciesCryptoPP";
 	}
 	
+        private static void loadOtherPrivateKey()
+	{
+		FileInputStream fis = null;
+		try
+		{
+			fis = new FileInputStream(new File("OtherPrivate.key"));
+			byte[] keystr = new byte[fis.available()];
+			fis.read(keystr, 0, fis.available());
+			fis.close();
+			String key = new String(keystr);
+			otherprivateKey = hexStringToByteArray(key);
+		}
+		catch(Exception e)
+		{
+			otherprivateKey = new byte[]{};
+			if (fis != null)
+			{
+				try
+				{
+					fis.close();
+				}
+				catch(Exception ex)
+				{}
+			}
+		}
+	}
+        
+        private static void loadOldPrivateKey()
+	{
+		FileInputStream fis = null;
+		try
+		{
+			fis = new FileInputStream(new File("OldPrivate.key"));
+			byte[] keystr = new byte[fis.available()];
+			fis.read(keystr, 0, fis.available());
+			fis.close();
+			String key = new String(keystr);
+			OldprivateKey = hexStringToByteArray(key);
+		}
+		catch(Exception e)
+		{
+			OldprivateKey = new byte[]{};
+			if (fis != null)
+			{
+				try
+				{
+					fis.close();
+				}
+				catch(Exception ex)
+				{}
+			}
+		}
+	}
+        
+        
 	private static void loadPrivateKey()
 	{
 		FileInputStream fis = null;
@@ -171,6 +241,11 @@ public class EciesCryptoPP
 		for (int i = 0; i < Keys.Z3_KEY_RAIDERZ_KR_NA.length; i++)
 			PWEKey[i] = (byte) Keys.Z3_KEY_RAIDERZ_KR_NA[i];
 
+                WildKey = new byte[Keys.Z3_KEY_RAIDERZ_WILD.length];
+		for (int i = 0; i < Keys.Z3_KEY_RAIDERZ_WILD.length; i++)
+			WildKey[i] = (byte) Keys.Z3_KEY_RAIDERZ_WILD[i];
+                
+                
 		PWEKeyUpdaterConf = new byte[Keys.Z3_KEY_RAIDERZ_KR_NA_UPDATERCONF.length];
 		for (int i = 0; i < Keys.Z3_KEY_RAIDERZ_KR_NA_UPDATERCONF.length; i++)
 			PWEKeyUpdaterConf[i] = (byte) Keys.Z3_KEY_RAIDERZ_KR_NA_UPDATERCONF[i];

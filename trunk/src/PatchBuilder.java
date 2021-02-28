@@ -27,7 +27,7 @@ public class PatchBuilder
 			System.out.println("Old fileindex read/parse error!");
 			return;
 		}
-		System.out.println("Done.");
+		System.out.println("Done!");
 		
 		System.out.println("Loading new fileindex...");
 		MsfFile mfnew = MsfFile.read(newdir);
@@ -36,9 +36,9 @@ public class PatchBuilder
 			System.out.println("New fileindex read/parse error!");
 			return;
 		}
-		System.out.println("Done.");
+		System.out.println("Done!");
 		
-		File f = new File("./patch.mpf");
+		File f = new File("NewVersion/patch.mpf");
 		//delete file if exist
 		if (f.exists())
 			f.delete();
@@ -240,7 +240,7 @@ public class PatchBuilder
 					raf.write(FileUtils.getIntToByte(curpoint - cursizepos));
 					raf.seek(curpoint);
 					
-					System.out.println("Done.");
+					System.out.println("Done!");
 				}
 			}
 			
@@ -334,7 +334,7 @@ public class PatchBuilder
 				raf.write(FileUtils.getIntToByte(curpoint - cursizepos));
 				raf.seek(curpoint);
 			}
-			System.out.println("Done.");
+			System.out.println("Done!");
 			
 			//remove files
 			System.out.println("Process remove files...");
@@ -361,7 +361,7 @@ public class PatchBuilder
 				raf.write(FileUtils.getIntToByte(curpoint - cursizepos));
 				raf.seek(curpoint);
 			}
-			System.out.println("Done.");
+			System.out.println("Done!");
 			
 			//replace files
 			System.out.println("Process replace files...");
@@ -442,8 +442,250 @@ public class PatchBuilder
 				raf.write(FileUtils.getIntToByte(curpoint - cursizepos));
 				raf.seek(curpoint);
 			}
-			System.out.println("Done.");
+			System.out.println("Done!");
 			
+			// write final size
+			int curpoint = (int) raf.getFilePointer();
+			raf.seek(0);
+			raf.write(FileUtils.getIntToByte(curpoint - MPATCHHEADER.length - 4));
+                        System.out.println("Finished Build Patch!");
+		}
+		catch(Exception e)
+		{
+			e.printStackTrace();
+		}
+		finally
+		{
+			if (raf != null)
+				try
+				{
+					raf.close();
+				}
+				catch(Exception e)
+				{
+				}
+		}
+	}
+        
+        public static void makePatchNewClient(String newdir, String olddir)
+	{
+		// first load fileindex
+		System.out.println("Creating Folder Patch Only...");
+		System.out.println("---------------------------------------------------");
+                
+		File f = new File("NewVersion/patch.mpf");
+                
+		//delete file if exist
+		if (f.exists())
+			f.delete();
+		RandomAccessFile raf = null;
+		try
+		{
+			raf = new RandomAccessFile(f, "rw");
+			//skip size
+			raf.write(FileUtils.getIntToByte(0));
+			//write header
+			raf.write(MPATCHHEADER);
+			
+			
+			// check cur dir files
+			ArrayList<String> filesnew = new ArrayList<String>();
+			ArrayList<String> filesold = new ArrayList<String>();
+			ArrayList<String> filesadd = new ArrayList<String>();
+			ArrayList<String> filesremove = new ArrayList<String>();
+			ArrayList<String> filesreplace = new ArrayList<String>();
+			// list new files
+			for (File fl: new File(newdir).listFiles())
+			{
+				if (!fl.isDirectory())
+				{
+					filesnew.add(fl.getName());
+					filesadd.add(fl.getName());
+				}
+			}
+			
+			// list old files
+			for (File fl: new File(olddir).listFiles())
+			{
+				if (!fl.isDirectory())
+				{
+					filesold.add(fl.getName());
+					filesremove.add(fl.getName());
+				}
+			}
+			
+			// make add files
+			for (String of: filesold)
+				filesadd.remove(of);
+			// make remove files
+			for (String of: filesnew)
+				filesremove.remove(of);
+			// make replace files
+			for (String of: filesadd)
+				filesnew.remove(of);
+			for (String of: filesnew)
+			{
+				if (!FileUtils.calcMD5File(newdir + "/" + of).equals(FileUtils.calcMD5File(olddir + "/" + of)))
+					filesreplace.add(of);
+			}
+			
+			//add files
+			System.out.println("Process add files...");
+			for (String of: filesadd)
+			{
+				System.out.println(of);
+				File ffile = new File(newdir + "/" + of);
+				int cursizepos = (int) raf.getFilePointer();
+				// skip size
+				raf.write(FileUtils.getIntToByte(0));
+				// write type
+				raf.writeByte(1);
+				// write new size
+				raf.write(FileUtils.getIntToByte((int) ffile.length()));
+				// write new md5
+				raf.write(FileUtils.calcMD5File(ffile));
+				// write name
+				raf.write(FileUtils.getIntToByte(of.getBytes(Charset.forName("UTF-8")).length));
+				raf.write(of.getBytes(Charset.forName("UTF-8")));
+				
+				byte[] data = new byte[(int) ffile.length()];
+				FileInputStream fis = new FileInputStream(ffile);
+				fis.read(data);
+				fis.close();
+				
+				ByteArrayInputStream bai = new ByteArrayInputStream(data);
+
+				ByteArrayOutputStream bas = new ByteArrayOutputStream(data.length * 2);
+
+				Encoder encoder = new Encoder();
+
+				encoder.setLcLpPb(3, 0, 2);
+				encoder.setDictionarySize(0x10000);
+				encoder.code(bai, bas, -1, -1, null);
+						
+				data = bas.toByteArray();
+				
+				// write compressed size
+				raf.write(FileUtils.getIntToByte(data.length));
+				//write data
+				raf.write(data);
+				
+				// write final block size
+				int curpoint = (int) raf.getFilePointer();
+				raf.seek(cursizepos);
+				raf.write(FileUtils.getIntToByte(curpoint - cursizepos));
+				raf.seek(curpoint);
+			}
+			System.out.println("Done!");
+			System.out.println("---------------------------------------------------");
+			//remove files
+			System.out.println("Process remove files...");
+			for (String of: filesremove)
+			{
+				System.out.println(of);
+				File ffile = new File(olddir + "/" + of);
+				int cursizepos = (int) raf.getFilePointer();
+				// skip size
+				raf.write(FileUtils.getIntToByte(0));
+				// write type
+				raf.writeByte(2);
+				// write new size
+				raf.write(FileUtils.getIntToByte((int) ffile.length()));
+				// write new md5
+				raf.write(FileUtils.calcMD5File(ffile));
+				// write name
+				raf.write(FileUtils.getIntToByte(of.getBytes(Charset.forName("UTF-8")).length));
+				raf.write(of.getBytes(Charset.forName("UTF-8")));
+								
+				// write final block size
+				int curpoint = (int) raf.getFilePointer();
+				raf.seek(cursizepos);
+				raf.write(FileUtils.getIntToByte(curpoint - cursizepos));
+				raf.seek(curpoint);
+			}
+			System.out.println("Done!");
+			System.out.println("---------------------------------------------------");
+			//replace files
+			System.out.println("Process replace files...");
+			for (String of: filesreplace)
+			{
+				System.out.println(of);
+				File ffile = new File(newdir + "/" + of);
+				int cursizepos = (int) raf.getFilePointer();
+				// skip size
+				raf.write(FileUtils.getIntToByte(0));
+				// write type
+				raf.writeByte(3);
+				// write new size
+				raf.write(FileUtils.getIntToByte((int) ffile.length()));
+				// write new md5
+				raf.write(FileUtils.calcMD5File(ffile));
+				// write name
+				raf.write(FileUtils.getIntToByte(of.getBytes(Charset.forName("UTF-8")).length));
+				raf.write(of.getBytes(Charset.forName("UTF-8")));
+				
+				int offset = 0;
+				byte[] data = new byte[(int) ffile.length() + 4 + 1 + 4 + 4 + 1 + 4 + 4];
+				byte[] tmp = FileUtils.getIntToByte((int) ffile.length());
+				// new file size
+				System.arraycopy(tmp, 0, data, offset, 4);
+				offset += 4;
+				// remove
+				data[offset++] = 0;
+				// start pos
+				tmp = FileUtils.getIntToByte(0);
+				System.arraycopy(tmp, 0, data, offset, 4);
+				offset += 4;
+				//endpos
+				File tfile = new File(olddir + "/" + of);
+				tmp = FileUtils.getIntToByte((int) tfile.length());
+				System.arraycopy(tmp, 0, data, offset, 4);
+				offset += 4;
+				//add
+				data[offset++] = 1;
+				// start pos
+				tmp = FileUtils.getIntToByte(0);
+				System.arraycopy(tmp, 0, data, offset, 4);
+				offset += 4;
+				//endpos
+				tmp = FileUtils.getIntToByte((int) ffile.length());
+				System.arraycopy(tmp, 0, data, offset, 4);
+				offset += 4;
+				
+				FileInputStream fis = new FileInputStream(ffile);
+				fis.read(data, offset, (int) ffile.length());
+				fis.close();
+				
+				int size = data.length;
+				
+				ByteArrayInputStream bai = new ByteArrayInputStream(data);
+
+				ByteArrayOutputStream bas = new ByteArrayOutputStream(data.length * 2);
+
+				Encoder encoder = new Encoder();
+
+				encoder.setLcLpPb(3, 0, 2);
+				encoder.setDictionarySize(0x10000);
+				encoder.code(bai, bas, -1, -1, null);
+						
+				data = bas.toByteArray();
+				
+				
+				// write uncompressed size
+				raf.write(FileUtils.getIntToByte(size));
+				// write compressed size
+				raf.write(FileUtils.getIntToByte(data.length));
+				//write data
+				raf.write(data);
+				
+				// write final block size
+				int curpoint = (int) raf.getFilePointer();
+				raf.seek(cursizepos);
+				raf.write(FileUtils.getIntToByte(curpoint - cursizepos));
+				raf.seek(curpoint);
+			}
+			System.out.println("Done!");
+			System.out.println("---------------------------------------------------");
 			// write final size
 			int curpoint = (int) raf.getFilePointer();
 			raf.seek(0);
@@ -464,5 +706,8 @@ public class PatchBuilder
 				{
 				}
 		}
-	}
+	} // fim funcao 
+        
+        
+        
 }

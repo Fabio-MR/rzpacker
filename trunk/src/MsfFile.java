@@ -95,6 +95,87 @@ public class MsfFile
 		}
 		return mf;
 	}
+        
+        
+        public static MsfFile readwild(String clientdir)
+	{
+		MsfFile mf = new MsfFile();
+		File f = new File(clientdir + "/" + "fileindex.msf");
+		FileInputStream fis = null;
+		byte[] filemsfdata = new byte[0];
+		try
+		{
+			fis = new FileInputStream(f);
+			filemsfdata = new byte[fis.available()];
+			fis.read(filemsfdata);
+		}
+		catch(Exception e)
+		{
+			e.printStackTrace();
+			return null;
+		}
+		finally
+		{
+			if (fis != null)
+				try
+				{
+					fis.close();
+				}
+				catch(Exception e)
+				{
+				}
+		}
+		
+		//decript msf
+		filemsfdata = EciesCryptoPP.decryptWild(filemsfdata);
+		if (filemsfdata.length == 0)
+		{
+			System.out.println("Fileindex decrypt error!");
+			return null;
+		}
+		
+		int fileindexsize = FileUtils.readInt(filemsfdata, 0);
+		byte[] temp = new byte[filemsfdata.length - 4];
+		System.arraycopy(filemsfdata, 4, temp, 0, temp.length);
+		filemsfdata = temp;
+		//unpack
+		try
+		{
+			filemsfdata = Snappy.uncompress(filemsfdata);
+		}
+		catch(Exception e)
+		{
+			e.printStackTrace();
+			return null;
+		}
+		if (filemsfdata.length != fileindexsize)
+		{
+			System.out.println("Fileindex unpack error!");
+			return null;
+		}
+		
+		ByteBuffer msf = ByteBuffer.wrap(filemsfdata).order(ByteOrder.LITTLE_ENDIAN);
+		mf.fileindex = new TreeMap<String, TreeMap<Integer, MsfEntry>>();
+		while(msf.hasRemaining())
+		{
+			msf.get();//skeep compress method
+			MsfEntry me = MsfEntry.readEntry(msf);
+			TreeMap<Integer, MsfEntry> mrfindex = mf.fileindex.get(me.mrfFileName);
+			if (mrfindex == null)
+			{
+				mrfindex = new TreeMap<Integer, MsfEntry>();
+				mf.fileindex.put(me.mrfFileName, mrfindex);
+			}
+			MsfEntry tme = mrfindex.put(me.offset, me);
+			if (tme != null)
+			{
+				
+				System.out.println("Error entrys has same position: " + tme.fileName + " " + me.fileName);
+			}
+		}
+		return mf;
+	}
+        
 	
 	public boolean save(String clientdir)
 	{
@@ -162,6 +243,75 @@ public class MsfFile
 
 		return true;
 	}
+        
+        
+        public boolean savewild(String clientdir)
+	{
+		int msfsize = getSize();
+
+		ByteBuffer msf = ByteBuffer.wrap(new byte[msfsize]).order(ByteOrder.LITTLE_ENDIAN);
+
+		for (String mrfname: fileindex.keySet())
+		{
+			TreeMap<Integer, MsfEntry> mrfindex = fileindex.get(mrfname);
+			for (Integer offset: mrfindex.keySet())
+			{
+				msf.put((byte)0);
+				mrfindex.get(offset).writeEntry(msf);
+			}
+		}
+
+		msf.rewind();
+		byte[] filemsfdata = new byte[msf.remaining()];
+		msf.get(filemsfdata);
+
+		//pack
+		try
+		{
+			filemsfdata = Snappy.compress(filemsfdata);
+		}
+		catch(Exception e)
+		{
+			e.printStackTrace();
+			return false;
+		}
+
+		
+		//put filesize
+		byte[] finalmsfdata = new byte[filemsfdata.length + 4];
+		System.arraycopy(FileUtils.getIntToByte(msfsize), 0, finalmsfdata, 0, 4);
+		System.arraycopy(filemsfdata, 0, finalmsfdata, 4, filemsfdata.length);
+
+		//encript msf
+		finalmsfdata = EciesCryptoPP.encrypt(finalmsfdata);
+
+		File f = new File(clientdir + "/" + "fileindex.msf");
+		FileOutputStream fos = null;
+		try
+		{
+			fos = new FileOutputStream(f);
+			fos.write(finalmsfdata);
+		}
+		catch(Exception e)
+		{
+			e.printStackTrace();
+			return false;
+		}
+		finally
+		{
+			if (fos != null)
+				try
+				{
+					fos.close();
+				}
+				catch(Exception e)
+				{
+				}
+		}
+
+		return true;
+	}
+        
 	
 	public int getSize()
 	{

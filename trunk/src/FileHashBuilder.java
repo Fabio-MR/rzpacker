@@ -31,7 +31,8 @@ public class FileHashBuilder
 					fhi.size = (int) t.length();
 					fhi.checksumm = FileUtils.calcMD5File(t);
 					list.add(fhi);
-					System.out.println("Done");
+					System.out.println("Done!");
+                                        System.out.println("---------------------------------------------------");
 				}
 			}
 
@@ -47,7 +48,8 @@ public class FileHashBuilder
 					fhi.size = (int) t.length();
 					fhi.checksumm = FileUtils.calcMD5File(t);
 					list.add(fhi);
-					System.out.println("Done");
+					System.out.println("Done!");
+                                        System.out.println("---------------------------------------------------");
 				}
 			}
 
@@ -84,6 +86,7 @@ public class FileHashBuilder
 			fos.write(FileUtils.getIntToByte(size));
 			fos.write(bas.toByteArray());
 			fos.close();
+                        System.out.println("Finished Hash!");
 		}
 		catch (Exception e)
 		{
